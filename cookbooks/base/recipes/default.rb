@@ -31,28 +31,34 @@ allMysqlUsers.each do |mysqlUser|
   username = mysqlUser["id"]
   password = mysqlUser["password"]
   permissions = mysqlUser["mysqlPermissions"]
+  deleteFlag = mysqlUser["delete"]
   userExists = false
 
-  ruby_block 'check_if_user_exists ' do
-    block do
-      command = "mysql -S /var/run/mysql-foo/mysqld.sock -u root -p'pass' -e \"SELECT COUNT(*) FROM mysql.user WHERE User='#{username}' AND Host='localhost'\""
-      commandOut = shell_out(command)
-      userExistsCount = commandOut.stdout.split("\n")[1].to_i
-      # puts userExistsCount
-      if userExistsCount != 0
-        userExists = true
-      end
-    end
-    action :run
-  end
+  # ruby_block 'check_if_user_exists' do
+  #   block do
+  #     command = "mysql -S /var/run/mysql-foo/mysqld.sock -u root -p'pass' -e \"SELECT COUNT(*) FROM mysql.user WHERE User='#{username}' AND Host='localhost'\""
+  #     commandOut = shell_out(command)
+  #     userExistsCount = commandOut.stdout.split("\n")[1].to_i
+  #     # puts userExistsCount
+  #     if userExistsCount != 0
+  #       userExists = true
+  #     end
+  #   end
+  #   action :run
+  # end
 
   execute 'create_mysql_user' do
     command "mysql -S /var/run/mysql-foo/mysqld.sock -u root -p'pass' -e \"CREATE USER '#{username}'@'localhost' IDENTIFIED BY '#{password}'\""
-    only_if {!userExists}
+    only_if {shell_out("mysql -S /var/run/mysql-foo/mysqld.sock -u root -p'pass' -e \"SELECT COUNT(*) FROM mysql.user WHERE User='#{username}' AND Host='localhost'\"").stdout.split("\n")[1].to_i == 0 && !deleteFlag}
   end
 
   execute 'alter_mysql_user_perm' do
     command "mysql -S /var/run/mysql-foo/mysqld.sock -u root -p'pass' -e \"GRANT #{permissions.join(',')} ON *.* TO '#{username}'@'localhost'\""
-    only_if {userExists}
+    only_if {shell_out("mysql -S /var/run/mysql-foo/mysqld.sock -u root -p'pass' -e \"SELECT COUNT(*) FROM mysql.user WHERE User='#{username}' AND Host='localhost'\"").stdout.split("\n")[1].to_i != 0}
+  end
+
+  execute 'delete_mysql_user' do
+    command "mysql -S /var/run/mysql-foo/mysqld.sock -u root -p'pass' -e \"DROP USER '#{username}'@'localhost'\""
+    only_if {shell_out("mysql -S /var/run/mysql-foo/mysqld.sock -u root -p'pass' -e \"SELECT COUNT(*) FROM mysql.user WHERE User='#{username}' AND Host='localhost'\"").stdout.split("\n")[1].to_i != 0 && deleteFlag}
   end
 end
