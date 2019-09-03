@@ -1,0 +1,5 @@
+{
+  "id": "user2",
+  "password": "Eloqua123",
+  "mysqlPermissions": ["SELECT", "CREATE"]
+}
